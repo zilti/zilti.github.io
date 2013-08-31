@@ -3,7 +3,7 @@
 
 You'll need to have jfxrt.jar in your local maven repository. See [this coderwall protip](https://coderwall.com/p/4yjy1a) for how to make this happen.
 
-**Installation: `[clojurefx &quot;0.0.2&quot;]`**" name="description" /><style type="text/css">/**
+**Installation: `[clojurefx &quot;0.0.3&quot;]`**" name="description" /><style type="text/css">/**
  * SyntaxHighlighter
  * http://alexgorbatchev.com/SyntaxHighlighter
  *
@@ -3032,11 +3032,11 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.2</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
+</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.3</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
 
 <p>You'll need to have jfxrt.jar in your local maven repository. See <a href="https://coderwall.com/p/4yjy1a">this coderwall protip</a> for how to make this happen.</p>
 
-<p><strong>Installation: <code>[clojurefx "0.0.2"]</code></strong></p>
+<p><strong>Installation: <code>[clojurefx "0.0.3"]</code></strong></p>
 </div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.5.1</td></tr><tr><td class="dep-name">com.oracle/javafx-runtime</td><td class="dotted"><hr /></td><td class="dep-version">2.2.0</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#clojurefx.core">clojurefx.core</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.core" name="clojurefx.core"><h1 class="project-name">clojurefx.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojurefx.core
   (:require [clojure.string :as str]))</pre></td></tr><tr><td class="docs">
@@ -3045,17 +3045,15 @@ net.brehaut.ClojureTools = (function (SH) {
   (javafx.application.Platform/runLater f))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro run-later [&amp; body]
   `(run-later* (fn [] ~@body)))</pre></td></tr><tr><td class="docs"><p>A modification of run-later waiting for the running method to return. You should use run-now.</p>
-</td><td class="codes"><pre class="brush: clojure">(declare ^:dynamic *nested?*)
-(defn run-now* [f]
-(let [result (promise)]
-  (run-later
-   (deliver result (try (f) (catch Throwable e e))))
-  @result))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn run-now* [f]
+(if (= &quot;JavaFX Application Thread&quot; (.. Thread currentThread getName))
+  (apply f [])
+  (let [result (promise)]
+    (run-later
+     (deliver result (try (f) (catch Throwable e e))))
+    @result)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro run-now [&amp; body]
-  (if *nested?*
-    `((fn [] ~@body))
-    (binding [*nested?* true]
-      `(run-now* (fn [] ~@body)))))</pre></td></tr><tr><td class="docs">
+  `(run-now* (fn [] ~@body)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- camel [in]
   (let [in (name in)
         in (str/split in #&quot;-&quot;)
