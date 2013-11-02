@@ -3032,17 +3032,23 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.3</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
+</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.4</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
 
 <p>You'll need to have jfxrt.jar in your local maven repository. See <a href="https://coderwall.com/p/4yjy1a">this coderwall protip</a> for how to make this happen.</p>
 
 <p><strong>Installation: <code>[clojurefx "0.0.3"]</code></strong></p>
-</div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.5.1</td></tr><tr><td class="dep-name">com.oracle/javafx-runtime</td><td class="dotted"><hr /></td><td class="dep-version">2.2.0</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#clojurefx.core">clojurefx.core</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.core" name="clojurefx.core"><h1 class="project-name">clojurefx.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.5.1</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#clojurefx.core">clojurefx.core</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.core" name="clojurefx.core"><h1 class="project-name">clojurefx.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojurefx.core
-  (:require [clojure.string :as str]))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defonce force-toolkit-init (javafx.embed.swing.JFXPanel.))</pre></td></tr><tr><td class="docs"><p>Simple wrapper for Platform/runLater. You should use run-later.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn run-later* [f]
-  (javafx.application.Platform/runLater f))</pre></td></tr><tr><td class="docs">
+  (:require [clojure.string :as str]
+            [clojure.data :as cljdata]
+            [clojure.walk :refer :all]
+            [clojure.reflect :refer :all]))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defonce force-toolkit-init (javafx.embed.swing.JFXPanel.))</pre></td></tr><tr><td class="docs"><h2>Threading helpers</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Simple wrapper for Platform/runLater. You should use run-later.</p>
+</td><td class="codes"><pre class="brush: clojure">(def exception (atom nil))
+(defn run-later* [f]
+(javafx.application.Platform/runLater (try f
+                                           (catch IllegalArgumentException e (reset! exception e)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro run-later [&amp; body]
   `(run-later* (fn [] ~@body)))</pre></td></tr><tr><td class="docs"><p>A modification of run-later waiting for the running method to return. You should use run-now.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn run-now* [f]
@@ -3051,92 +3057,235 @@ net.brehaut.ClojureTools = (function (SH) {
   (let [result (promise)]
     (run-later
      (deliver result (try (f) (catch Throwable e e))))
-    @result)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmacro run-now [&amp; body]
-  `(run-now* (fn [] ~@body)))</pre></td></tr><tr><td class="docs">
+    @result)))</pre></td></tr><tr><td class="docs"><p>Runs the code on the FX application thread and waits until the return value is delivered.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro run-now  [&amp; body]
+  `(run-now* (fn [] ~@body)))</pre></td></tr><tr><td class="docs"><p>TODO this is an idiotic place for this function.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- prepend-and-camel [prep s]
+  (symbol (str (name prep) (str/upper-case (subs (name s) 0 1)) (subs (name s) 1))))</pre></td></tr><tr><td class="docs"><h2>Collection helpers</h2>
+
+<p>This probably isn't the ideal approach for mutable collections. Check back for better ones.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn seq-&gt;observable [s]
+  (javafx.collections.FXCollections/unmodifiableObservableList s))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn map-&gt;observable [m]
+  (javafx.collections.FXCollections/unmodifiableObservableMap m))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn set-&gt;observable [s]
+  (javafx.collections.FXCollections/unmodifiableObservableSet s))</pre></td></tr><tr><td class="docs"><h2>Encapsulation and preprocessing</h2>
+
+<h3>KeyCode</h3>
+</td><td class="codes"><pre class="brush: clojure">(defn- prep-key-code [k]
+  {:keycode k
+   :name (-&gt; (.getName k) str/lower-case keyword)
+   :value (-&gt; (.valueOf k) str/lower-case keyword)
+   :arrow? (.isArrowKey k)
+   :digit? (.isDigitKey k)
+   :function? (.isFunctionKey k)
+   :keypad? (.isKeypadKey k)
+   :media? (.isMediaKey k)
+   :modifier? (.isModifierKey k)
+   :navigation? (.isNavigationKey k)
+   :whitespace? (.isWhitespaceKey k)})</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- prep-pickresult [p]
+  {:pickresult p
+   :distance (.getIntersectedDistance p)
+   :face (.getIntersectedFace p)
+   :node (.getIntersectedNode p)
+   :point (.getIntersectedPoint p)
+   :tex-coord (.getIntersectedTexCoord p)})</pre></td></tr><tr><td class="docs"><h2>Event handling</h2>
+
+<h3>Properties</h3>
+
+<h4>Binding</h4>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Binds a property to an atom.
+Other STM objects might be supported in the future.
+Whenever the content of the atom changes, this change is propagated to the property.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn bind-property  [obj prop at]
+  (let [listeners (atom [])
+        observable (proxy [javafx.beans.value.ObservableValue] []
+                     (addListener [l] (swap! listeners conj l))
+                     (removeListener [l] (swap! listeners #(remove #{l} %)))
+                     (getValue [] @at))]
+    (add-watch at (keyword (str (name obj) (name prop)))
+               (fn [_ r oldS newS]
+                 (doseq [listener listeners]
+                   (.changed listener observable oldS newS))))))</pre></td></tr><tr><td class="docs"><h3>Events</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- prep-event-map [e &amp; {:as m}]
+  (let [prep {:event e
+              :source (.getSource e)
+              :type (.getEventType e)
+              :target (.getTarget e)
+              :consume #(.consume e)
+              :string (.toString e)}]
+    (if (nil? m) prep (merge prep m))))
+(defn- add-modifiers [m e]
+  (merge m
+         {:alt-down? (.isAltDown e)
+          :control-down? (.isControlDown e)
+          :meta-down? (.isMetaDown e)
+          :shift-down? (.isShiftDown e)
+          :shortcut-down? (.isShortcutDown e)}))
+(defn- add-coords [m e]
+  (merge m
+         {:screen-coords {:x (.getScreenX e) :y (.getScreenY e)}
+          :scene-coords {:x (.getSceneX e) :y (.getSceneY e)}
+          :coords {:x (.getX e) :y (.getY e) :z (.getZ e)}}))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmulti preprocess-event (fn [e] (type e)))
+(defmethod preprocess-event :default [e]
+  (prep-event-map e))
+(defmethod preprocess-event javafx.scene.input.ContextMenuEvent [e]
+  (-&gt; (prep-event-map e
+                     :pickresult (prep-pickresult (.getPickResult e))
+                     :keyboard-trigger? (.isKeyboardTrigger e))
+     (add-coords e)))
+(defmethod preprocess-event javafx.scene.input.InputMethodEvent [e]
+  (prep-event-map e
+                  :caret-position (.getCaretPosition e)
+                  :committed (.getCommitted e)
+                  :composed (.getComposed e)))
+(defmethod preprocess-event javafx.scene.input.KeyEvent [e]
+  (-&gt; (prep-event-map e
+                     :character (.getCharacter e)
+                     :code (prep-key-code (.getCode e))
+                     :text (.getText e))
+     (add-modifiers e)))
+(defmethod preprocess-event javafx.scene.input.MouseEvent [e]
+  (-&gt; (prep-event-map e
+                     :button (-&gt; (.getButton e) .valueOf str/lower-case keyword)
+                     :click-count (.getClickCount e)
+                     :pickresult (prep-pickresult (.getPickResult e))
+                     :drag-detected? (.isDragDetect e)
+                     :primary-button? (.isPrimaryButtonDown e)
+                     :secondary-button? (.isSecondaryButtonDown e)
+                     :middle-button? (.isMiddleButtonDown e)
+                     :popup-trigger? (.isPopupTrigger e)
+                     :sill-since-press? (.isStillSincePress e)
+                     :synthesized? (.isSynthesized e))
+     (add-modifiers e)
+     (add-coords e)))
+(defmethod preprocess-event javafx.scene.input.TouchEvent [e]
+  (prep-event-map e
+                  :set-id (.getEventSetId e)
+                  :touch-count (.getTouchCount e)
+                  :touch-point (.getTouchPoint e) ;; TODO Wrapper for TouchPoint
+                  :touch-points (.getTouchPoints e)
+                  :alt-down? (.isAltDown e)
+                  :control-down? (.isControlDown e)
+                  :meta-down? (.isMetaDown e)
+                  :shift-down? (.isShiftDown e)))</pre></td></tr><tr><td class="docs"><p>Adds a listener to a node event.
+The listener gets a preprocessed event map as shown above.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn add-listener  [obj event fun]
+(. obj (prepend-and-camel &quot;set&quot; (name event))
+   (proxy [javafx.event.EventHandler] []
+     (handle [t] (-&gt; t preprocess-event fun)))))</pre></td></tr><tr><td class="docs"><h2>Builder parsing</h2>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- camel [in]
   (let [in (name in)
         in (str/split in #&quot;-&quot;)
         in (map #(if (= (str (first %)) (str/upper-case (first %)))
                    % (str/capitalize %)) in)
-        in (conj (into [] in) &quot;Builder&quot;)]
-    (apply str in)))</pre></td></tr><tr><td class="docs"><p>An exhaustive list of <a href="http://docs.oracle.com/javafx/2/api/javafx/util/Builder.html">everything implementing the builder pattern</a>. In the future it will be possible to add entries yourself.<br/>
-Don't use this yourself; See the macros "build" and "deffx" below.</p>
+        in (into [] in)]
+    (apply str in)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def pkgs (atom {&quot;javafx.scene.control&quot; '[accordion button cell check-box check-box-tree-item check-menu-item choice-box
+                                          color-picker combo-box context-menu custom-menu-item hyperlink
+                                          indexed-cell index-range label list-cell list-view menu-bar menu menu-button menu-item
+                                          pagination password-field popup-control progress-bar progress-indicator
+                                          radio-button radio-menu-item scroll-bar scroll-pane separator
+                                          separator-menu-item slider split-menu-button split-pane tab table-cell table-column
+                                          table-position table-row table-view tab-pane text-area text-field tree-cell
+                                          titled-pane toggle-button toggle-group tool-bar tooltip tree-item tree-view]
+                 &quot;javafx.scene.control.cell&quot; '[check-box-list-cell check-box-table-cell check-box-tree-cell
+                                               choice-box-list-cell choice-box-table-cell choice-box-tree-cell
+                                               combo-box-list-cell combo-box-table-cell combo-box-tree-cell
+                                               text-field-list-cell text-field-table-cell text-field-tree-cell
+                                               property-value-factory]
+                 &quot;javafx.scene.layout&quot; '[anchor-pane border-pane column-constraints flow-pane grid-pane h-box pane region
+                                         row-constraints stack-pane tile-pane v-box]
+                 &quot;javafx.scene.text&quot; '[text font]
+                 &quot;javafx.scene.shape&quot; '[arc arc-to circle close-path cubic-curve cubic-curve-to ellipse
+                                        h-line-to line line-to move-to path polygon polyline quad-curve quad-curve-to
+                                        rectangle SVG-path]
+                 &quot;javafx.scene.canvas&quot; '[canvas]
+                 &quot;javafx.scene.image&quot; '[image-view]
+                 &quot;javafx.scene.input&quot; '[clipboard-content key-character-combination key-code-combination mnemonic]
+                 &quot;javafx.scene.effect&quot; '[blend bloom box-blur color-adjust color-input displacement-map drop-shadow float-map
+                                         gaussian-blur glow image-input inner-shadow lighting motion-blur perspective-transform
+                                         reflection sepia-tone shadow]
+                 &quot;javafx.scene.paint&quot; '[color image-pattern linear-gradient radial-gradient stop]
+                 &quot;javafx.scene.chart&quot; '[chart area-chart bar-chart line-chart bubble-chart pie-chart scatter-chart
+                                        stacked-area-chart stacked-bar-chart x-y-chart
+                                        axis category-axis number-axis value-axis]
+                 &quot;javafx.scene.media&quot; '[audio-clip media media-player media-view]
+                 &quot;javafx.scene.transform&quot; '[affine rotate scale shear translate]
+                 &quot;javafx.scene.web&quot; '[HTML-editor prompt-data web-engine web-view]
+                 &quot;javafx.scene&quot; '[scene group image-cursor perspective-camera snapshot-parameters]
+                 &quot;javafx.animation&quot; '[fade-transition fill-transition parallel-transition path-transition pause-transition
+                                      rotate-transition scale-transition sequential-transition stroke-transition timeline
+                                      translate-transition]
+                 &quot;javafx.stage&quot; '[stage directory-chooser file-chooser popup]
+                 &quot;javafx.geometry&quot; '[bounding-box dimension-2D insets point-2D point-3D rectangle-2D]
+                 &quot;javafx.embed.swing&quot; '[JFX-panel-builder]}))</pre></td></tr><tr><td class="docs"><p>An exhaustive list of every visual JavaFX component. To add entries, modify the pkgs atom.<br/>
+Don't use this yourself; See the macros "fx" and "deffx" below.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- get-qualified  [builder]
-  (let [pkgs {&quot;javafx.scene.control&quot; '[accordion button cell check-box check-box-tree-item check-menu-item choice-box
-                                       color-picker combo-box context-menu custom-menu-item hyperlink
-                                       indexed-cell index-range label list-cell list-view menu-bar menu menu-button menu-item
-                                       pagination password-field popup-control progress-bar progress-indicator
-                                       radio-button radio-button-menu-item scroll-bar scroll-pane separator
-                                       separator-menu-item slider split-menu-button split-pane tab table-cell table-column
-                                       table-position table-row table-view tab-pane text-area text-field tree-cell
-                                       titled-pane toggle-button toggle-group tool-bar tooltip tree-item tree-view]
-              &quot;javafx.scene.control.cell&quot; '[check-box-list-cell check-box-table-cell check-box-tree-cell
-                                            choice-box-list-cell choice-box-table-cell choice-box-tree-cell
-                                            combo-box-list-cell combo-box-table-cell combo-box-tree-cell
-                                            text-field-list-cell text-field-table-cell text-field-tree-cell
-                                            property-value-factory]
-              &quot;javafx.scene.layout&quot; '[anchor border-pane column-constraints flow-pane grid-pane h-box pane region
-                                      row-constraints stack-pane tile-pane v-box]
-              &quot;javafx.scene.text&quot; '[text font]
-              &quot;javafx.scene.shape&quot; '[arc arc-to circle close-path cubic-curve cubic-curve-to ellipse
-                                     h-line-to line line-to move-to path polygon polyline quad-curve quad-curve-to
-                                     rectangle SVG-path b-line-to]
-              &quot;javafx.scene.canvas&quot; '[canvas]
-              &quot;javafx.scene.image&quot; '[image-view]
-              &quot;javafx.scene.input&quot; '[clipboard-content key-character-combination key-code-combination mnemonic]
-              &quot;javafx.scene.effect&quot; '[blend bloom box-blur color-adjust color-input displacement-map dropshadow float-map
-                                      gaussian-blur glow image-input inner-shadow lighting motion-blur perspective-transform
-                                      reflection sepia-tone shadow]
-              &quot;javafx.scene.paint&quot; '[color image-pattern linear-gradient radial-gradient stop]
-              &quot;javafx.scene.chart&quot; '[chart area-chart bar-chart line-chart bubble-chart pie-chart scatter-chart
-                                     stacked-area-chart stacked-bar-chart x-y-chart
-                                     axis category-axis number-axis value-axis]
-              &quot;javafx.scene.media&quot; '[audio-clip media media-player media-view]
-              &quot;javafx.scene.transform&quot; '[affine rotate scale shear translate]
-              &quot;javafx.scene.web&quot; '[HTML-editor prompt-data web-engine web-view]
-              &quot;javafx.scene&quot; '[scene group image-cursor perspective-camera snapshot-parameters]
-              &quot;javafx.animation&quot; '[fade-transition fill-transition parallel-transition path-transition pause-transition
-                                   rotate-transition scale-transition sequential-transition stroke-transition timeline
-                                   translate-transition]
-              &quot;javafx.stage&quot; '[stage directory-chooser file-chooser popup]
-              &quot;javafx.geometry&quot; '[bounding-box dimension-2D insets point-2D point-3D rectangle-2D]
-              &quot;javafx.embed.swt&quot; '[custom-transfer]
-              &quot;javafx.embed.swing&quot; '[JFX-panel-builder]}
-        builder (symbol builder)]
-    (first (filter (comp not nil?) (for [k (keys pkgs)]
-                                     (if (not (empty? (filter #(= % builder) (get pkgs k))))
-                                       (symbol (str k &quot;.&quot; (camel (name builder))))))))))</pre></td></tr><tr><td class="docs"><p>This helper macro makes it easier to use the <a href="http://docs.oracle.com/javafx/2/api/javafx/util/Builder.html">JavaFX builder classes</a>. You can also use a map, so it is possible to compose the arguments for the builder over time.</p>
+(let [builder (symbol builder)]
+  (first (filter (comp not nil?) (for [k (keys @pkgs)]
+                                   (if (not (empty? (filter #(= % builder) (get @pkgs k))))
+                                     (symbol (str k &quot;.&quot; (camel (name builder))))))))))</pre></td></tr><tr><td class="docs"><p>Fetches all public methods of a class.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn method-fetcher  [class]
+  (filter #(contains? (:flags %) :public) (filter :return-type (:members (reflect class)))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- uncamelcaseize [sym]
+  (let [s (-&gt; sym str seq)]
+    (loop [s s
+           out (list)]
+      (if (empty? s)
+        (subs (-&gt;&gt; out reverse (apply str)) 1)
+        (recur (rest s)
+               (if (Character/isUpperCase (first s))
+                 (-&gt;&gt; out (cons \-) (cons (Character/toLowerCase (first s))))
+                 (cons (first s) out)))))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def get-method-calls (memoize (fn [ctrl]
+                                 (let [full (get-qualified ctrl)
+                                       fns (eval `(method-fetcher ~full))
+                                       calls (atom {})]
+                                   (doseq [fun fns
+                                           :when (= &quot;set&quot; (subs (str (:name fun)) 0 3))]
+                                     (swap! calls assoc
+                                            (keyword (uncamelcaseize (subs (name (:name fun)) 3)))
+                                            (eval `(fn [obj# arg#] (. obj# ~(:name fun) arg#)))))
+                                   @calls))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmulti construct-node (fn [class args] class))
+(defmethod construct-node :default [class _]
+  (run-now (eval `(new ~class))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn constructor-helper [clazz &amp; args]
+  (run-now (clojure.lang.Reflector/invokeConstructor (resolve clazz) (to-array (remove nil? args)))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod construct-node 'javafx.scene.Scene [clazz args]
+  (constructor-helper clazz (:root args) (:width args) (:height args) (:depth-buffer args)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmulti wrap-arg (fn [class arg] class))
+(defmethod wrap-arg :default [class arg]
+  arg)</pre></td></tr><tr><td class="docs"><p>The central macro of ClojureFX. This takes the name of a node as declared in the pkgs atom and
+named arguments for the constructor arguments and object setters.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro fx  [ctrl &amp; {:keys [bind listen] :as args}]
+  (let [props# bind
+        listeners# listen
+        qualified-name# (get-qualified ctrl)
+        methods# (get-method-calls ctrl)
+        args# (eval (dissoc args :bind :listen))
+        obj# (construct-node qualified-name# args#)
+        proc-args# (into {} (for [key# (keys args#)]
+                              (wrap-arg qualified-name# [key# (key# args#)])))]
+    (run-now (doseq [arg# proc-args#]
+               (if (contains? methods# (key arg#))
+                 (((key arg#) methods#) obj# (val arg#))))
+             (doseq [prop# props#]
+               (bind-property obj# (key prop#) (val prop#)))
+             (doseq [listener# listeners#]
+               (add-listener obj# (key listener#) (val listener#)))
+             obj#)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmacro deffx [name ctrl &amp; props]
+  `(def ~name (fx ~ctrl ~@props)))</pre></td></tr><tr><td class="docs"><h2>Tables</h2>
 
-<p><strong>Examples:</strong></p>
-
-<ul>
-<li><code>(build button (text "Close me.") (cancelButton true))</code></li>
-<li><code>(build button {:text "Close me." :cancelButton true})</code></li>
-</ul>
-</td><td class="codes"><pre class="brush: clojure">(defmacro build [what &amp; args]
-  (if (and (= 1 (count args))
-           (map? (first args)))
-    `(build ~what ~@(for [entry# (keys (first args))]
-                      `(~(symbol (name entry#)) ~((first args) entry#))))
-    `(run-now (.. ~(get-qualified what) ~(symbol &quot;create&quot;)
-                  ~@args
-                  ~(symbol &quot;build&quot;)))))</pre></td></tr><tr><td class="docs"><p>Uses build and assigns the result to a symbol.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmacro deffx [name what &amp; args]
-`(def ~name
-     (build ~what ~@args)))</pre></td></tr><tr><td class="docs"><p>Adds a listener to  prop ("Property" gets added automatically) of obj, gets the value and passes it to fun.<br/>
-Example: <code>(add-listener inputfield focused #(println "Focus change!"))</code></p>
-
-<h3>Event handling</h3>
-</td><td class="codes"><pre class="brush: clojure">(defmacro add-listener [obj prop fun]
-  `(.. ~obj
-       ~(symbol (str (name prop) &quot;Property&quot;))
-       (addListener (reify javafx.beans.value.ChangeListener
-                      (changed [c#]
-                        (~fun (.getValue c#)))))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn event-handler* [f]
-  (reify javafx.event.EventHandler
-    (handle [this e] (f e))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmacro event-handler [arg &amp; body]
-  `(event-handler* (fn ~arg ~@body)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+<p>Table data in an atom</p>
+</td><td class="codes"><pre class="brush: clojure">(defn add-listener [coll l]
+  (with-meta coll (update-in (meta coll) [:listener] conj l)))
+(defn remove-listener [coll l]
+  (with-meta coll (update-in (meta coll) [:listener] (fn [x y] (remove #(= y %) x)) l)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
        SyntaxHighlighter.all()</script></body></html>
