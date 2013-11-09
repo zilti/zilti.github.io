@@ -5,7 +5,7 @@
   
   [This Project On GitHub](https://www.github.com/zilti/clojurefx)
 
-**Installation: `[clojurefx &quot;0.0.7&quot;]`**" name="description" /><style type="text/css">/**
+**Installation: `[clojurefx &quot;0.0.8&quot;]`**" name="description" /><style type="text/css">/**
  * SyntaxHighlighter
  * http://alexgorbatchev.com/SyntaxHighlighter
  *
@@ -3034,13 +3034,13 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.8-SNAPSHOT</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
+</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.9-SNAPSHOT</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
 
 <p>  This is meant to be used with Java 8. If you add JavaFX 2.2 to your classpath it might still work, but that isn't tested.</p>
 
 <p>  <a href="https://www.github.com/zilti/clojurefx">This Project On GitHub</a></p>
 
-<p><strong>Installation: <code>[clojurefx "0.0.7"]</code></strong></p>
+<p><strong>Installation: <code>[clojurefx "0.0.8"]</code></strong></p>
 </div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.5.1</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#clojurefx.core">clojurefx.core</a></li><li><a href="#clojurefx.extensions.core-async">clojurefx.extensions.core-async</a></li><li><a href="#clojurefx.extensions.meltdown">clojurefx.extensions.meltdown</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.core" name="clojurefx.core"><h1 class="project-name">clojurefx.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojurefx.core
   (:require [clojure.string :as str]
@@ -3082,11 +3082,9 @@ net.brehaut.ClojureTools = (function (SH) {
   (javafx.collections.FXCollections/unmodifiableObservableMap m))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn set-&gt;observable [s]
   (javafx.collections.FXCollections/unmodifiableObservableSet s))</pre></td></tr><tr><td class="docs"><h2>Data binding</h2>
-</td><td class="codes"><pre class="brush: clojure">(defmulti bidirectional-bind-property! (fn [type obj prop &amp; args] type))</pre></td></tr><tr><td class="docs"><p>Binds a property to an atom.
-Other STM objects might be supported in the future.
-Whenever the content of the atom changes, this change is propagated to the property.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmulti bind-property!  (fn [obj prop target] (type target)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod bind-property! clojure.lang.Atom [obj prop at]
+</td><td class="codes"><pre class="brush: clojure">(defmulti bidirectional-bind-property! (fn [type obj prop &amp; args] type))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmulti bind-property!* (fn [obj prop target] (type target)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod bind-property!* clojure.lang.Atom [obj prop at]
   (let [listeners (atom [])
         inv-listeners (atom [])
         prop (str (camel prop true) &quot;Property&quot;)
@@ -3103,7 +3101,13 @@ Whenever the content of the atom changes, this change is propagated to the prope
                           (doseq [listener @listeners] (.changed listener observable oldS newS)))))
     (run-now (.bind property observable))
     (run-now (doseq [listener @inv-listeners] (.invalidated listener observable)))
-    obj))</pre></td></tr><tr><td class="docs"><h2>Events</h2>
+    obj))</pre></td></tr><tr><td class="docs"><p>Binds a property to an atom.
+Other STM objects might be supported in the future.
+Whenever the content of the atom changes, this change is propagated to the property.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro bind-property!  [obj &amp; args]
+  (let [m# (apply hash-map args)]
+    `(do ~@(for [entry# m#]
+             `(bind-property!* ~obj ~(key entry#) ~(val entry#))))))</pre></td></tr><tr><td class="docs"><h2>Events</h2>
 </td><td class="codes"><pre class="brush: clojure">(defn- prep-key-code [k]
   {:keycode k
    :name (-&gt; (.getName k) str/lower-case keyword)
@@ -3243,7 +3247,9 @@ The return value of modification-function becomes the new value.</p>
 (defmethod swap-content! javafx.scene.control.TitledPane [obj fun]
   (.setContent obj (fun (.getContent obj))))
 (defmethod swap-content! javafx.scene.control.Tab [obj fun]
-  (.setContent obj (fun (.getContent obj))))</pre></td></tr><tr><td class="docs"><h2>Builder parsing</h2>
+  (.setContent obj (fun (.getContent obj))))</pre></td></tr><tr><td class="docs"><p>(experimental) fetches a property from a node.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro getfx  [obj prop]
+  `(~(symbol (str &quot;.&quot; (prepend-and-camel &quot;get&quot; (name prop)))) ~obj))</pre></td></tr><tr><td class="docs"><h2>Builder parsing</h2>
 </td><td class="codes"><pre class="brush: clojure">(def pkgs (atom {&quot;javafx.scene.control&quot; '[accordion button cell check-box check-box-tree-item check-menu-item choice-box
                                           color-picker combo-box context-menu custom-menu-item date-picker date-cell hyperlink
                                           indexed-cell index-range label list-cell list-view menu-bar menu menu-button menu-item
@@ -3351,31 +3357,30 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
     (deref q)
     q))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn fx* [ctrl &amp; args]
-  (let [args# (if-not (and (nil? args) (map? args)) (apply hash-map args) args)
+  (let [args# (if-not (and (nil? (first args)) (map? (first args))) (apply hash-map args) (first args))
         {:keys [bind listen content children]} args#
         props# bind
         listeners# listen
-        content# (merge content children)
+        content# (-&gt; [] (into content) (into children))
         qualified-name# (get-qualified ctrl)
         methods# (get-method-calls ctrl)
         args# (dissoc args# :bind :listen)
         obj# (construct-node qualified-name# args#)]
-    (println content#)
     (run-now (doseq [arg# args#] ;; Apply arguments
                (if (contains? methods# (key arg#))
                  (((key arg#) methods#) obj# (val arg#))))
              (doseq [prop# props#] ;; Bind properties
-               (bind-property! obj# (key prop#) (val prop#)))
+               (bind-property!* obj# (key prop#) (val prop#)))
              (doseq [listener# listeners#] ;; Add listeners
                (set-listener!* obj# (key listener#) (val listener#)))
-             (doseq [entry content#] ;; Set swappables
-               (apply swap-content! obj# (fn [_] entry)))
+             (if-not (empty? content#)
+               (swap-content! obj# (fn [_] content#)))
              obj#)))</pre></td></tr><tr><td class="docs"><p>The central macro of ClojureFX. This takes the name of a node as declared in the pkgs atom and
 named arguments for the constructor arguments and object setters.</p>
 
 <p>Special keys:
  * <code>bind</code> takes a map where the key is a property name (e.g. :text or :grid-lines-visible) and the value an atom. This internally calls <code>bind-property!</code>.
- * <code>listen</code> (TBD)
+ * <code>listen</code> takes a map where the key is an event name (e.g. :on-action) and the value a function handling this event.
  * <code>content</code> or <code>children</code> (equivalent) must be a datastructure a function given to <code>swap-content!</code> would return.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro fx  [ctrl &amp; args]
 `(fx* '~ctrl ~@args;;(for [arg args] `(quote ~arg))))</pre></td></tr><tr><td class="docs">
