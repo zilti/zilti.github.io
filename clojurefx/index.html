@@ -3402,10 +3402,13 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
              obj#)))</pre></td></tr><tr><td class="docs"><p>The central macro of ClojureFX. This takes the name of a node as declared in the pkgs atom and
 named arguments for the constructor arguments and object setters.</p>
 
-<p>Special keys:
- * <code>bind</code> takes a map where the key is a property name (e.g. :text or :grid-lines-visible) and the value an atom. This internally calls <code>bind-property!</code>.
- * <code>listen</code> takes a map where the key is an event name (e.g. :on-action) and the value a function handling this event.
- * <code>content</code> or <code>children</code> (equivalent) must be a datastructure a function given to <code>swap-content!</code> would return.</p>
+<p>Special keys:</p>
+
+<ul>
+<li><code>bind</code> takes a map where the key is a property name (e.g. :text or :grid-lines-visible) and the value an atom. This internally calls <code>bind-property!</code>.</li>
+<li><code>listen</code> takes a map where the key is an event name (e.g. :on-action) and the value a function handling this event.</li>
+<li><code>content</code> or <code>children</code> (equivalent) must be a datastructure a function given to <code>swap-content!</code> would return.</li>
+</ul>
 </td><td class="codes"><pre class="brush: clojure">(defmacro fx  [ctrl &amp; args]
 `(fx* '~ctrl ~@args))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro deffx [name ctrl &amp; props]
