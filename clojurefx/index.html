@@ -5,7 +5,7 @@
   
   [This Project On GitHub](https://www.github.com/zilti/clojurefx)
 
-**Installation: `[clojurefx &quot;0.0.8&quot;]`**
+**Installation: `[clojurefx &quot;0.0.9&quot;]`**
 
 Navigation
 ----------
@@ -3042,13 +3042,13 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.9-SNAPSHOT</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
+</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.10-SNAPSHOT</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
 
 <p>  This is meant to be used with Java 8. If you add JavaFX 2.2 to your classpath it might still work, but that isn't tested.</p>
 
 <p>  <a href="https://www.github.com/zilti/clojurefx">This Project On GitHub</a></p>
 
-<p><strong>Installation: <code>[clojurefx "0.0.8"]</code></strong></p>
+<p><strong>Installation: <code>[clojurefx "0.0.9"]</code></strong></p>
 
 <h2>Navigation</h2>
 
@@ -3098,7 +3098,15 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"><pre class="brush: clojure">(defn map-&gt;observable [m]
   (javafx.collections.FXCollections/unmodifiableObservableMap m))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn set-&gt;observable [s]
-  (javafx.collections.FXCollections/unmodifiableObservableSet s))</pre></td></tr><tr><td class="docs"><h2><a name="databinding"></a> Data binding</h2>
+  (javafx.collections.FXCollections/unmodifiableObservableSet s))</pre></td></tr><tr><td class="docs"><p>Autoboxing-like behaviour for arguments for ClojureFX nodes.</p>
+
+<p>Argument wrapping</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti wrap-arg  (fn [arg class] arg))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :default [arg class] arg)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :accelerator [arg _]
+  (if (string? arg)
+    (javafx.scene.input.KeyCombination/keyCombination arg)
+    arg))</pre></td></tr><tr><td class="docs"><h2><a name="databinding"></a> Data binding</h2>
 </td><td class="codes"><pre class="brush: clojure">(defmulti bidirectional-bind-property! (fn [type obj prop &amp; args] type))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmulti bind-property!* (fn [obj prop target] (type target)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod bind-property!* clojure.lang.Atom [obj prop at]
@@ -3254,17 +3262,7 @@ The return value of modification-function becomes the new value.</p>
               :dividers (into [] (.getDividers obj))}
         res (fun data)]
     (.setAll (.getItems obj) (:items res))
-    (.setAll (.getDividers obj) (:dividers res))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.control.TableView [obj fun]
-  (let [data {:items (into [] (.getItems obj))
-              :columns (into [] (.getColumns obj))
-              :sort-order (into [] (.getSortOrder obj))
-              :visible-leaf-columns (into [] (.getVisibleLeafColumns obj))}
-        res (fun data)]
-    (.setAll (.getItems obj) (:items res))
-    (.setAll (.getColumns obj) (:columns res))
-    (.setAll (.getSortOrder obj) (:sort-order res))
-    (.setAll (.getVisibleLeafColumns obj) (:visible-leaf-columns res))))</pre></td></tr><tr><td class="docs"><p>TODO TreeTableView</p>
+    (.setAll (.getDividers obj) (:dividers res))))</pre></td></tr><tr><td class="docs"><p>TODO TreeTableView</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.control.ScrollPane [obj fun]
   (.setContent obj (fun (.getContent obj))))
@@ -3355,21 +3353,7 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmulti construct-node (fn [class args] class))
 (defmethod construct-node :default [class _]
   (run-now (eval `(new ~class))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(construct javafx.scene.Scene [:root :width :height :depth-buffer :scene-antialiasing])
-(construct javafx.stage.Stage [:stage-style])
-(construct javafx.scene.control.ColorPicker [:color])</pre></td></tr><tr><td class="docs"><p>Autoboxing-like behaviour for arguments for ClojureFX nodes.</p>
-
-<p>Argument wrapping</p>
-</td><td class="codes"><pre class="brush: clojure">(defmulti wrap-arg  (fn [arg class] arg))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :default [arg class] arg)</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :scene-antialiasing [arg class]
-  (clojure.lang.Reflector/getStaticField javafx.scene.SceneAntialiasing (-&gt; arg name str/upper-case)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :stage-style [arg class]
-  (clojure.lang.Reflector/getStaticField javafx.stage.StageStyle (-&gt; arg name str/upper-case)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :accelerator [arg _]
-  (if (string? arg)
-    (javafx.scene.input.KeyCombination/keyCombination arg)
-    arg))</pre></td></tr><tr><td class="docs"><p>Builder API</p>
+</td><td class="codes"><pre class="brush: clojure">(construct javafx.scene.control.ColorPicker [:color])</pre></td></tr><tr><td class="docs"><p>Builder API</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- symbolwalker [q]
   (if (symbol? q)
     (if-let [x (resolve q)]
@@ -3392,7 +3376,7 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
         obj# (construct-node qualified-name# args#)]
     (run-now (doseq [arg# args#] ;; Apply arguments
                (if (contains? methods# (key arg#))
-                 (((key arg#) methods#) obj# (val arg#))))
+                 (((key arg#) methods#) obj# (wrap-arg (val arg#) (type obj#)))))
              (doseq [prop# props#] ;; Bind properties
                (bind-property!* obj# (key prop#) (val prop#)))
              (doseq [listener# listeners#] ;; Add listeners
@@ -3412,7 +3396,34 @@ named arguments for the constructor arguments and object setters.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro fx  [ctrl &amp; args]
 `(fx* '~ctrl ~@args))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro deffx [name ctrl &amp; props]
-  `(def ~name (fx ~ctrl ~@props)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.extensions.core-async" name="clojurefx.extensions.core-async"><h1 class="project-name">clojurefx.extensions.core-async</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+  `(def ~name (fx ~ctrl ~@props)))</pre></td></tr><tr><td class="docs"><p>Stage</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(construct javafx.stage.Stage [:stage-style])</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :stage-style [arg class]
+  (clojure.lang.Reflector/getStaticField javafx.stage.StageStyle (-&gt; arg name str/upper-case)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.stage.Stage [obj fun]
+  (.setScene obj (fun (.getScene obj))))</pre></td></tr><tr><td class="docs"><p>Scene</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(construct javafx.scene.Scene [:root :width :height :depth-buffer :scene-antialiasing])</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :scene-antialiasing [arg class]
+  (clojure.lang.Reflector/getStaticField javafx.scene.SceneAntialiasing (-&gt; arg name str/upper-case)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.Scene [obj fun]
+  (.setRoot obj (fun (.getRoot obj))))</pre></td></tr><tr><td class="docs"><p>Table view</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :items javafx.scene.control.TableView [arg clazz]
+  (seq-&gt;observable arg))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :columns javafx.scene.control.TableView [arg clazz]
+  (seq-&gt;observable arg))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.control.TableView [obj fun]
+  (let [data {:items (into [] (.getItems obj))
+              :columns (into [] (.getColumns obj))
+              :sort-order (into [] (.getSortOrder obj))
+              :visible-leaf-columns (into [] (.getVisibleLeafColumns obj))}
+        res (fun data)]
+    (.setAll (.getItems obj) (:items res))
+    (.setAll (.getColumns obj) (:columns res))
+    (.setAll (.getSortOrder obj) (:sort-order res))
+    (.setAll (.getVisibleLeafColumns obj) (:visible-leaf-columns res))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.extensions.core-async" name="clojurefx.extensions.core-async"><h1 class="project-name">clojurefx.extensions.core-async</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojurefx.extensions.core-async)</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojurefx.extensions.meltdown" name="clojurefx.extensions.meltdown"><h1 class="project-name">clojurefx.extensions.meltdown</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojurefx.extensions.meltdown)</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
        SyntaxHighlighter.all()</script></body></html>
