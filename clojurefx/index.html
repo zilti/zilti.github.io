@@ -5,7 +5,7 @@
   
   [This Project On GitHub](https://www.github.com/zilti/clojurefx)
 
-**Installation: `[clojurefx &quot;0.0.9&quot;]`**
+**Installation: `[clojurefx &quot;0.0.11&quot;]`**
 
 Navigation
 ----------
@@ -3042,13 +3042,13 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.10-SNAPSHOT</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
+</script><title>clojurefx -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">clojurefx</h1><h2 class="project-version">0.0.13-SNAPSHOT</h2><br /><p>Helper functions and probably a wrapper to simplify usage of JavaFX in Clojure.</p>
 
 <p>  This is meant to be used with Java 8. If you add JavaFX 2.2 to your classpath it might still work, but that isn't tested.</p>
 
 <p>  <a href="https://www.github.com/zilti/clojurefx">This Project On GitHub</a></p>
 
-<p><strong>Installation: <code>[clojurefx "0.0.9"]</code></strong></p>
+<p><strong>Installation: <code>[clojurefx "0.0.11"]</code></strong></p>
 
 <h2>Navigation</h2>
 
@@ -3078,7 +3078,38 @@ net.brehaut.ClojureTools = (function (SH) {
      (deliver result (try (f) (catch Throwable e e))))
     @result)))</pre></td></tr><tr><td class="docs"><p>Runs the code on the FX application thread and waits until the return value is delivered.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro run-now  [&amp; body]
-  `(run-now* (fn [] ~@body)))</pre></td></tr><tr><td class="docs">
+  `(run-now* (fn [] ~@body)))</pre></td></tr><tr><td class="docs"><h2>Helper functions</h2>
+</td><td class="codes"><pre class="brush: clojure">(defmacro keyword-&gt;enum [enum kw]
+  (let [upper (-&gt; kw name str/upper-case)]
+    `(~(symbol (str (name enum) &quot;/&quot; &quot;valueOf&quot;)) ~upper)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn enum-&gt;keyword [enum]
+  (-&gt; (.toString enum) str/lower-case))</pre></td></tr><tr><td class="docs"><p>Fetches all public methods of a class.</p>
+</td><td class="codes"><pre class="brush: clojure">(def method-fetcher 
+  (memoize
+   (fn [class]
+     (let [cl (reflect class)
+           current-methods (filter #(contains? (:flags %) :public) (filter :return-type (:members cl)))
+           static-methods (filter #(contains? (:flags %) :static) current-methods)
+           instance-methods (remove #(contains? (:flags %) :static) current-methods)
+           methods {:instance (map :name instance-methods)
+                    :static (map :name static-methods)}]
+       (if (nil? cl)
+         methods
+         (reduce (fn [a b]
+                   (let [b (method-fetcher (resolve b))]
+                     (-&gt; a
+                        (update-in [:instance] #(flatten (conj % (:instance b))))
+                        (update-in [:static] #(flatten (conj % (:static b))))))) methods (:bases cl)))))))</pre></td></tr><tr><td class="docs"><p>TODO inefficient.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn exec-method [inst method &amp; args]
+  (let [clazz# (symbol (.getName (class inst)))
+        clazz# (if (= clazz# 'java.lang.Class) inst clazz#)
+        methods# (method-fetcher inst)]
+    (cond
+     ((comp not empty?) (filter #(= method %) (:instance methods#)))
+     (clojure.lang.Reflector/invokeInstanceMethod inst (name method) (to-array args))
+     ((comp not empty?) (filter #(= method %) (:static methods#)))
+     (clojure.lang.Reflector/invokeStaticMethod (name clazz#) (name method) (to-array args))
+     :else (throw (new Exception (str &quot;Method not existing: &quot; method))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn camel [in &amp; [method?]]
   (let [in (name in)
         in (str/split in #&quot;-&quot;)
@@ -3090,7 +3121,21 @@ net.brehaut.ClojureTools = (function (SH) {
       in)))</pre></td></tr><tr><td class="docs"><p>TODO this is an idiotic place for this function.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn prepend-and-camel [prep s]
   (let [c (camel (str prep &quot;-&quot; s))]
-    (str (str/lower-case (subs c 0 1)) (subs c 1))))</pre></td></tr><tr><td class="docs"><h2>Collection helpers</h2>
+    (str (str/lower-case (subs c 0 1)) (subs c 1))))</pre></td></tr><tr><td class="docs"><p>fetches a property from a node.</p>
+
+<p>TODO inefficient.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn getfx  [obj prop &amp; args]
+  (let [method (if (= &quot;?&quot; (subs (name prop) (dec (count (name prop)))))
+                 (symbol (str (prepend-and-camel &quot;is&quot; (subs (name prop) 0 (dec (count (name prop)))))))
+                 (symbol (str (prepend-and-camel &quot;get&quot; (name prop)))))]
+    (apply exec-method obj method args)))</pre></td></tr><tr><td class="docs"><p>creates and applies a setter.</p>
+
+<p>TODO inefficient.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn setfx  [obj prop &amp; args]
+  (let [method (if (= &quot;?&quot; (subs (name prop) (dec (count (name prop)))))
+                 (symbol (str (prepend-and-camel &quot;set&quot; (subs (name prop) 0 (dec (count (name prop)))))))
+                 (symbol (str (prepend-and-camel &quot;set&quot; (name prop)))))]
+    (apply exec-method obj method args)))</pre></td></tr><tr><td class="docs"><h2>Collection helpers</h2>
 
 <p>This probably isn't the ideal approach for mutable collections. Check back for better ones.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn seq-&gt;observable [s]
@@ -3161,15 +3206,15 @@ Whenever the content of the atom changes, this change is propagated to the prope
               :target (.getTarget e)
               :consume #(.consume e)
               :string (.toString e)}]
-    (if (nil? m) prep (merge prep m))))
-(defn- add-modifiers [m e]
+    (if (nil? m) prep (merge prep m))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- add-modifiers [m e]
   (merge m
          {:alt-down? (.isAltDown e)
           :control-down? (.isControlDown e)
           :meta-down? (.isMetaDown e)
           :shift-down? (.isShiftDown e)
-          :shortcut-down? (.isShortcutDown e)}))
-(defn- add-coords [m e]
+          :shortcut-down? (.isShortcutDown e)}))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- add-coords [m e]
   (merge m
          {:screen-coords {:x (.getScreenX e) :y (.getScreenY e)}
           :scene-coords {:x (.getSceneX e) :y (.getSceneY e)}
@@ -3233,16 +3278,44 @@ The listener gets a preprocessed event map as shown above.</p>
 `(set-listener!* ~obj ~event (fn ~args ~@body)))</pre></td></tr><tr><td class="docs"><h2><a name="contentmodification"></a> Content modification</h2>
 
 <h3>Easy modification of child elements.</h3>
-
-<p>Usage: <code>(swap-content! &lt;object&gt; &lt;modification-function&gt;)</code>.
-The return value of modification-function becomes the new value.</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmulti swap-content! (fn [obj fun] (class obj)))
+</td><td class="codes"><pre class="brush: clojure">(defmulti swap-content!* (fn [obj fun] (class obj)))
 (defmacro def-simple-swapper [clazz getter setter]
-  `(defmethod swap-content! ~clazz [obj# fun#]
+  `(defmethod swap-content!* ~clazz [obj# fun#]
      (let [bunch# (~getter obj#)]
-       (run-now (~setter bunch# (fun# (into [] bunch#)))))))</pre></td></tr><tr><td class="docs">
+       (run-now (~setter bunch# (fun# (into [] bunch#)))))))</pre></td></tr><tr><td class="docs"><p>Usage: <code>(swap-content! &lt;object&gt; &lt;modification-function&gt;)</code>.
+The return value of modification-function becomes the new value, analogous to how <code>swap!</code> works.</p>
+
+<h3>Types of implementations</h3>
+
+<p>There are two kinds of <code>swap-content!*</code> implementations. First there are the simple ones for types like <code>Menu</code>, <code>Accordion</code> or the basic <code>Pane</code>. These simply pass the incoming function the list of children and expect to get such a list back. That kind is usually defined using the <code>def-simple-swapper</code>-macro.</p>
+
+<p>The others are of containers that have multiple content types. e.g. SplitPane: It has items and dividers. Therefore it hands the function a map with the keys <code>:items</code> and <code>:dividers</code>, each containing a list-like collection with all the items.</p>
+
+<h3>Metadata</h3>
+
+<p>Metadata can be added to the functions handed to <code>swap-content!*</code>. The following metadata must get respected by the implementations with multiple content types:
+* <strong>:modify</strong> Allowed values: <code>:primary</code>. This means that the given function only accepts the list of the primary child components (usually retrieved using getChildren) as an input.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro swap-content!
+  ([obj fun] `(do (swap-content!* ~obj ~fun) ~obj))
+  ([obj f arg &amp; args]
+     `(do (swap-content!* ~obj (fn [x#] (~f x# ~arg ~@args))) ~obj)))</pre></td></tr><tr><td class="docs"><p>Conjoins the given element to the end of the list of the primary child elements of obj or the child elements of type k.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro fx-conj! 
+  ([obj elem]
+     `(swap-content! ~obj conj ~elem))
+  ([obj k elem]
+     `(swap-content! ~obj (fn [x#] (update-in x# [~k] conj ~elem)))))</pre></td></tr><tr><td class="docs"><p>Removes the given element from either the primary child elements of obj, or from the child element type designated by the keyword k. See the specific swap-content!*-implementations to see what types are available.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro fx-remove! 
+  ([obj elem]
+     `(swap-content! ~obj (with-meta (fn [x#] (remove #(= % ~elem) x#)) {:modify :primary})))
+  ([obj k elem]
+     `(swap-content! ~obj (fn [x#] (update-in x# [~k] (fn [coll#] (remove #(= % ~elem) coll#)))))))</pre></td></tr><tr><td class="docs"><p>Analogous to fx-remove!, this removes <em>all</em> child elements from either the primary or the designated child element type.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro fx-remove-all! 
+  ([obj]
+     `(do (swap-content!* ~obj (with-meta (fn [x#] []) {:modify :primary})) ~obj))
+  ([obj k]
+     `(do (swap-content!* ~obj (fn [x#] (update-in x# [~k] (fn [x#] [])))) ~obj)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def-simple-swapper javafx.scene.layout.Pane .getChildren .setAll)
+(def-simple-swapper javafx.scene.Group .getChildren .setAll)
 (def-simple-swapper javafx.scene.control.Accordion .getPanes .setAll)
 (def-simple-swapper javafx.scene.control.ChoiceBox .getItems .setAll)
 (def-simple-swapper javafx.scene.control.ColorPicker .getCustomColors .setAll)
@@ -3256,22 +3329,21 @@ The return value of modification-function becomes the new value.</p>
 (def-simple-swapper javafx.scene.control.ToggleGroup .getToggles .setAll)
 (def-simple-swapper javafx.scene.control.ToolBar .getItems .setAll)
 (def-simple-swapper javafx.scene.control.TreeItem .getChildren .setAll)
-(def-simple-swapper javafx.scene.control.TreeTableColumn .getColumns .setAll)</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.control.SplitPane [obj fun]
+(def-simple-swapper javafx.scene.control.TreeTableColumn .getColumns .setAll)
+(def-simple-swapper javafx.scene.shape.Path .getElements .setAll)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content!* javafx.scene.control.SplitPane [obj fun]
   (let [data {:items (into [] (.getItems obj))
               :dividers (into [] (.getDividers obj))}
         res (fun data)]
     (.setAll (.getItems obj) (:items res))
     (.setAll (.getDividers obj) (:dividers res))))</pre></td></tr><tr><td class="docs"><p>TODO TreeTableView</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.control.ScrollPane [obj fun]
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content!* javafx.scene.control.ScrollPane [obj fun]
   (.setContent obj (fun (.getContent obj))))
-(defmethod swap-content! javafx.scene.control.TitledPane [obj fun]
+(defmethod swap-content!* javafx.scene.control.TitledPane [obj fun]
   (.setContent obj (fun (.getContent obj))))
-(defmethod swap-content! javafx.scene.control.Tab [obj fun]
-  (.setContent obj (fun (.getContent obj))))</pre></td></tr><tr><td class="docs"><p>(experimental) fetches a property from a node.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmacro getfx  [obj prop]
-  `(~(symbol (str &quot;.&quot; (prepend-and-camel &quot;get&quot; (name prop)))) ~obj))</pre></td></tr><tr><td class="docs"><h2>Builder parsing</h2>
+(defmethod swap-content!* javafx.scene.control.Tab [obj fun]
+  (.setContent obj (fun (.getContent obj))))</pre></td></tr><tr><td class="docs"><h2>Builder parsing</h2>
 </td><td class="codes"><pre class="brush: clojure">(def pkgs (atom {&quot;javafx.scene.control&quot; '[accordion button cell check-box check-box-tree-item check-menu-item choice-box
                                           color-picker combo-box context-menu custom-menu-item date-picker date-cell hyperlink
                                           indexed-cell index-range label list-cell list-view menu-bar menu menu-button menu-item
@@ -3312,19 +3384,18 @@ The return value of modification-function becomes the new value.</p>
                                       translate-transition]
                  &quot;javafx.stage&quot; '[stage directory-chooser file-chooser popup]
                  &quot;javafx.geometry&quot; '[bounding-box dimension-2D insets point-2D point-3D rectangle-2D]
-                 &quot;javafx.embed.swing&quot; '[JFX-panel]}))</pre></td></tr><tr><td class="docs"><p>An exhaustive list of every visual JavaFX component. To add entries, modify the pkgs atom.<br/>
+                 &quot;javafx.embed.swing&quot; '[JFX-panel]
+                 ;; Controlsfx
+                 &quot;org.controlsfx.control&quot; '[ButtonBar CheckComboBox CheckListView CheckTreeView
+                                            GridCell GridView HyperlinkLabel NotificationPane
+                                            PopOver PropertySheet RangeSlider Rating SegmentedButton]
+                 &quot;org.controlsfx.dialog&quot; '[Dialog]}))</pre></td></tr><tr><td class="docs"><p>An exhaustive list of every visual JavaFX component. To add entries, modify the pkgs atom.<br/>
 Don't use this yourself; See the macros "fx" and "deffx" below.</p>
 </td><td class="codes"><pre class="brush: clojure">(def get-qualified  (memoize (fn [builder]
              (let [builder (symbol builder)]
                (first (filter (comp not nil?) (for [k (keys @pkgs)]
                                               (if (not (empty? (filter #(= % builder) (get @pkgs k))))
-                                                (symbol (str k &quot;.&quot; (camel (name builder))))))))))))</pre></td></tr><tr><td class="docs"><p>Fetches all public methods of a class.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn method-fetcher  [class]
-  (let [cl (reflect class)
-        current-methods (filter #(contains? (:flags %) :public) (filter :return-type (:members cl)))]
-    (if (nil? cl)
-      current-methods
-      (reduce #(flatten (conj %1 (method-fetcher (resolve %2)))) current-methods (:bases cl)))))</pre></td></tr><tr><td class="docs">
+                                                (symbol (str k &quot;.&quot; (camel (name builder))))))))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- uncamelcaseize [sym]
   (let [s (-&gt; sym str seq)]
     (loop [s s
@@ -3337,23 +3408,28 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
                  (cons (first s) out)))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def get-method-calls (memoize (fn [ctrl]
                                  (let [full (resolve (get-qualified ctrl))
-                                       fns (eval `(method-fetcher ~full))
+                                       fnm (eval `(method-fetcher ~full))
+                                       fns (flatten [(:static fnm) (:instance fnm)])
                                        calls (atom {})]
                                    (doseq [fun fns
-                                           :when (= &quot;set&quot; (subs (str (:name fun)) 0 3))]
+                                           :when (= &quot;set&quot; (subs (str fun) 0 3))]
                                      (swap! calls assoc
-                                            (keyword (uncamelcaseize (subs (name (:name fun)) 3)))
-                                            (eval `(fn [obj# arg#] (. obj# ~(:name fun) arg#)))))
+                                            (keyword (uncamelcaseize (subs (name fun) 3)))
+                                            (eval `(fn [obj# arg#] (. obj# ~fun arg#)))))
                                    @calls))))</pre></td></tr><tr><td class="docs"><p>Constructor tools</p>
 </td><td class="codes"><pre class="brush: clojure">(defn constructor-helper [clazz &amp; args]
   (run-now (clojure.lang.Reflector/invokeConstructor (resolve clazz) (to-array (remove nil? args)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro construct [clazz keys]
   `(defmethod construct-node '~clazz [cl# ar#]
      (apply constructor-helper cl# (for [k# ~keys] (get ar# k#)))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmulti construct-node (fn [class args] class))
+</td><td class="codes"><pre class="brush: clojure">(defmulti construct-node (fn [class args] (resolve class)))
 (defmethod construct-node :default [class _]
-  (run-now (eval `(new ~class))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(construct javafx.scene.control.ColorPicker [:color])</pre></td></tr><tr><td class="docs"><p>Builder API</p>
+  (run-now (eval `(new ~class)))
+  )</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(construct javafx.scene.control.ColorPicker [:color])
+(construct javafx.scene.layout.BackgroundImage [:image :repeat-x :repeat-y :position :size])
+(construct javafx.scene.layout.BorderImage [:image :widths :insets :slices :filled :repeat-x :repeat-y]) ;; TODO Wrapper for BorderWidths, BorderRepeat and Insets</pre></td></tr><tr><td class="docs"><p>TODO Wrapper for BorderWidths, BorderRepeat and Insets</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Builder API</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- symbolwalker [q]
   (if (symbol? q)
     (if-let [x (resolve q)]
@@ -3369,7 +3445,10 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
         {:keys [bind listen content children]} args#
         props# bind
         listeners# listen
-        content# (-&gt; [] (into content) (into children))
+        content# (if (or (seq? content) (seq? children))
+                   (-&gt; [] (into content) (into children))
+                   (cond (not (nil? content)) content
+                         :else children))
         qualified-name# (get-qualified ctrl)
         methods# (get-method-calls ctrl)
         args# (dissoc args# :bind :listen)
@@ -3381,8 +3460,9 @@ Don't use this yourself; See the macros "fx" and "deffx" below.</p>
                (bind-property!* obj# (key prop#) (val prop#)))
              (doseq [listener# listeners#] ;; Add listeners
                (set-listener!* obj# (key listener#) (val listener#)))
-             (if-not (empty? content#)
-               (swap-content! obj# (fn [_] content#)))
+             (if (or (not (nil? content#))
+                    (and (seq? content#) (not (empty? content#))))
+               (swap-content!* obj# (fn [_] content#)))
              obj#)))</pre></td></tr><tr><td class="docs"><p>The central macro of ClojureFX. This takes the name of a node as declared in the pkgs atom and
 named arguments for the constructor arguments and object setters.</p>
 
@@ -3391,30 +3471,132 @@ named arguments for the constructor arguments and object setters.</p>
 <ul>
 <li><code>bind</code> takes a map where the key is a property name (e.g. :text or :grid-lines-visible) and the value an atom. This internally calls <code>bind-property!</code>.</li>
 <li><code>listen</code> takes a map where the key is an event name (e.g. :on-action) and the value a function handling this event.</li>
-<li><code>content</code> or <code>children</code> (equivalent) must be a datastructure a function given to <code>swap-content!</code> would return.</li>
+<li><code>content</code> or <code>children</code> (equivalent) must be a datastructure a function given to <code>swap-content!*</code> would return.</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defmacro fx  [ctrl &amp; args]
 `(fx* '~ctrl ~@args))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmacro deffx [name ctrl &amp; props]
-  `(def ~name (fx ~ctrl ~@props)))</pre></td></tr><tr><td class="docs"><p>Stage</p>
+  `(def ~name (fx ~ctrl ~@props)))</pre></td></tr><tr><td class="docs"><h2>Class-specific wrappers</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Stage</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(construct javafx.stage.Stage [:stage-style])</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :stage-style [arg class]
   (clojure.lang.Reflector/getStaticField javafx.stage.StageStyle (-&gt; arg name str/upper-case)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.stage.Stage [obj fun]
-  (.setScene obj (fun (.getScene obj))))</pre></td></tr><tr><td class="docs"><p>Scene</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content!* javafx.stage.Stage [obj fun]
+  (.setScene obj (fun (.getScene obj))))</pre></td></tr><tr><td class="docs"><h3>Scene</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(construct javafx.scene.Scene [:root :width :height :depth-buffer :scene-antialiasing])</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :scene-antialiasing [arg class]
   (clojure.lang.Reflector/getStaticField javafx.scene.SceneAntialiasing (-&gt; arg name str/upper-case)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.Scene [obj fun]
-  (.setRoot obj (fun (.getRoot obj))))</pre></td></tr><tr><td class="docs"><p>Table view</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content!* javafx.scene.Scene [obj fun]
+  (.setRoot obj (fun (.getRoot obj))))</pre></td></tr><tr><td class="docs"><h3>Image</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod construct-node javafx.scene.image.Image [c {:keys [is requested-width requested-height preserve-ratio smooth url background-loading] :as args}]
+  (cond
+   (contains? args :is) (constructor-helper c [is requested-width requested-height preserve-ratio smooth])
+   (and (contains? args :url)
+      (= 2 (count (keys args)))) (constructor-helper c [url background-loading])
+   :else (constructor-helper c [url requested-width requested-height preserve-ratio smooth background-loading])))</pre></td></tr><tr><td class="docs"><h3>LinearGradient</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod construct-node javafx.scene.paint.LinearGradient [c {:keys [start-x start-y end-x end-y proportional cycle-method stops]}]
+  (let [cycle-method (if (= (type cycle-method) javafx.scene.paint.CycleMethod)
+                       cycle-method
+                       (keyword-&gt;enum javafx.scene.paint.CycleMethod cycle-method))]
+    (constructor-helper c (double start-x) (double start-y) (double end-x) (double end-y) proportional cycle-method (into-array javafx.scene.paint.Stop stops))))</pre></td></tr><tr><td class="docs"><h3>GridPane</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content!* javafx.scene.layout.GridPane [obj fun]
+  (run-now
+   (let [mod-children? (= :primary (:modify (meta fun)))
+         data (map #({:node %
+                      :column-index (getfx obj :column-index %)
+                      :row-index (getfx obj :row-index %)
+                      :column-span (getfx obj :column-span %)
+                      :row-span (getfx obj :row-span %)
+                      :h-alignment (-&gt; (getfx obj :halignment %) .toString str/lower-case keyword)
+                      :v-alignment (-&gt; (getfx obj :valignment %) .toString str/lower-case keyword)
+                      :h-grow (getfx obj :hgrow %)
+                      :v-grow (getfx obj :vgrow %)
+                      :margin (getfx obj :margin %)
+                      :fill-height? (getfx obj :fill-height? %)
+                      :fill-width? (getfx obj :fill-width? %)}) (.getChildren obj))
+         fun-input (if mod-children? (.getChildren obj) data)
+         res (map #(if (map? %) % {:node %}) (fun fun-input))
+         children (.getChildren obj)]
+     (.setAll children (if mod-children? res (map :node res)))
+     ;; TODO: WTF is going on below this line exactly?
+     (doseq [child res
+             :let [n (:node child)]]
+       (doseq [[k v] child]
+         (case k
+           :column-index (setfx obj :column-index n (int v))
+           :row-index (setfx obj :row-index n (int v))
+           :column-span (setfx obj :column-span n (int v))
+           :row-span (setfx obj :row-span n (int v))
+           :h-alignment (setfx obj :halignment n (-&gt; v name str/upper-case javafx.geometry.HPos/valueOf))
+           :v-alignment (setfx obj :valignment n (-&gt; v name str/upper-case javafx.geometry.VPos/valueOf))
+           :h-grow (setfx obj :hgrow n v)
+           :v-grow (setfx obj :vgrow n v)
+           :margin (setfx obj :margin n v)
+           :fill-height? (setfx obj :fill-height? n v)
+           :fill-width? (setfx obj :fill-width? n v)
+           nil)))))
+  obj)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn swap-column-constraints! [obj fun]
+  (let [data (map #({:column %
+                     :h-alignment (.getHalignment %)
+                     :h-grow (.getHgrow %)
+                     :max-width (.getMaxWidth %)
+                     :min-width (.getMinWidth %)
+                     :percent-width (.getPercentWidth %)
+                     :pref-width (.getPrefWidth %)
+                     :fill-width? (.isFillWidth %)}) (.getColumnConstraints obj))
+        res (fun data)]
+    (.setAll (.getColumnConstraints obj) (to-array []))
+    (doseq [col res
+            :let [const (new javafx.scene.layout.ColumnConstraints)]]
+      (doseq [[k v] col]
+        (case k
+          :h-alignment (.setHalignment const v)
+          :h-grow (.setHgrow const v)
+          :max-width (.setMaxWidth const v)
+          :min-width (.setMinWidth const v)
+          :percent-width (.setPercentWidth const v)
+          :pref-width (.setPrefWidth const v)
+          :fill-width? (.setFillWidth const v)
+          nil))
+      (.add (.getColumnConstraints obj) const)))
+  obj)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn swap-row-constraints! [obj fun]
+  (let [data (map #({:row %
+                     :v-alignment (.getValignment %)
+                     :v-grow (.getVgrow %)
+                     :max-height (.getMaxHeight %)
+                     :min-height (.getMinHeight %)
+                     :percent-height (.getPercentHeight %)
+                     :pref-height (.getPrefHeight %)
+                     :fill-height? (.isFillHeight %)}) (.getRowConstraints obj))
+        res (fun data)]
+    (.setAll (.getRowConstraints obj) (to-array []))
+    (doseq [row res
+            :let [const (new javafx.scene.layout.RowConstraints)]]
+      (doseq [[k v] row]
+        (case k
+          :v-alignment (.setValignment const v)
+          :v-grow (.setVgrow const v)
+          :max-height (.setMaxHeight const v)
+          :min-height (.setMinHeight const v)
+          :percent-height (.setPercentHeight const v)
+          :pref-height (.setPrefHeight const v)
+          :fill-height? (.setFillHeight const v)
+          nil))
+      (.add (.getRowConstraints obj) const)))
+  obj)</pre></td></tr><tr><td class="docs"><h3>Table view</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :items javafx.scene.control.TableView [arg clazz]
   (seq-&gt;observable arg))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod wrap-arg :columns javafx.scene.control.TableView [arg clazz]
   (seq-&gt;observable arg))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content! javafx.scene.control.TableView [obj fun]
+</td><td class="codes"><pre class="brush: clojure">(defmethod swap-content!* javafx.scene.control.TableView [obj fun]
   (let [data {:items (into [] (.getItems obj))
               :columns (into [] (.getColumns obj))
               :sort-order (into [] (.getSortOrder obj))
